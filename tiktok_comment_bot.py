@@ -16,20 +16,21 @@ PASSWORD = os.getenv("TIKTOK_PASSWORD")
 
 def login_to_tiktok(driver):
     driver.get("https://www.tiktok.com/login")
-    wait = WebDriverWait(driver, 20)  # Increased to 20 seconds
+    wait = WebDriverWait(driver, 20)
     
     try:
         print("Page loaded. HTML title:", driver.title)
-        time.sleep(5)  # Wait for JavaScript to load elements
-        print("Page source snippet after wait:", driver.page_source[:1000])  # More chars for context
+        time.sleep(5)  # Wait for JavaScript
+        print("Page source snippet after wait:", driver.page_source[:2000])  # More context
 
         # Try multiple strategies to find the "Log in" button
         login_button = None
         for xpath in [
             "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log in') or contains(., 'Login')]",
-            "//button[contains(., 'Log')]",  # Broader match
-            "//*[contains(@class, 'login') or contains(@class, 'Login')]/button",  # Class-based
-            "//button"  # Any button (last resort)
+            "//button[contains(., 'Log')]",
+            "//*[contains(@class, 'login') or contains(@class, 'Login')]/button",
+            "//button[@data-e2e='login-button']",  # TikTok-specific data attribute
+            "//button"  # Last resort
         ]:
             try:
                 login_button = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
@@ -78,7 +79,9 @@ def login_to_tiktok(driver):
     except TimeoutException as e:
         print(f"Login failed: {str(e)}. TikTok UI may have changed.")
         print("Current URL:", driver.current_url)
-        print("Page source snippet on failure:", driver.page_source[:1000])
+        with open("page_source_on_failure.html", "w", encoding="utf-8") as f:
+            f.write(driver.page_source)  # Save full source locally
+        print("Full page source saved to 'page_source_on_failure.html' (check Heroku filesystem)")
         raise
 
 def find_trending_videos(driver):
