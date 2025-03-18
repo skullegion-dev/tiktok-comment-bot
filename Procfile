@@ -1,1 +1,1 @@
-worker: python tiktok_comment_bot.py
+"worker: python tiktok_comment_bot.py" 
