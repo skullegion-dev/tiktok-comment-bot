@@ -146,7 +146,7 @@ def main():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/app/.chrome-for-testing/chrome"  # Heroku Chrome path
+    chrome_options.binary_location = "/app/.chrome-for-testing/chrome-linux64/chrome"  # Corrected Chrome path
 
     # Correct Chromedriver path for heroku-buildpack-chrome-for-testing
     chromedriver_path = "/app/.chrome-for-testing/chromedriver-linux64/chromedriver"
