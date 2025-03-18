@@ -21,11 +21,11 @@ PASSWORD = os.getenv("TIKTOK_PASSWORD")
 
 def login_to_tiktok(driver):
     driver.get("https://www.tiktok.com/login")
-    wait = WebDriverWait(driver, 40)  # Increased timeout
+    wait = WebDriverWait(driver, 40)
     
     try:
         logging.info(f"Page loaded. HTML title: {driver.title}")
-        time.sleep(5)  # Wait for JS load
+        time.sleep(5)
         
         # Step 1: Click "Use phone / email / username"
         try:
@@ -50,11 +50,11 @@ def login_to_tiktok(driver):
             for char in USERNAME:
                 username_field.send_keys(char)
                 time.sleep(0.1)
-            time.sleep(2)  # Extra delay after username
+            time.sleep(2)
         except TimeoutException:
             raise Exception("Username field not found")
 
-        # Step 3: Enter password (broader selector)
+        # Step 3: Enter password
         try:
             password_field = wait.until(
                 EC.presence_of_element_located(
@@ -67,6 +67,10 @@ def login_to_tiktok(driver):
                 password_field.send_keys(char)
                 time.sleep(0.1)
         except TimeoutException:
+            logging.error("Password field not found. Dumping full page source:")
+            full_source = driver.page_source
+            for i in range(0, len(full_source), 1000):  # Split into chunks for logs
+                logging.info(f"Page source chunk: {full_source[i:i+1000]}")
             raise Exception("Password field not found")
 
         # Step 4: Click "Log in" button
@@ -97,10 +101,6 @@ def login_to_tiktok(driver):
     except Exception as e:
         logging.error(f"Login failed: {str(e)}. TikTok UI may have changed or CAPTCHA detected.")
         logging.info(f"Current URL: {driver.current_url}")
-        logging.info(f"Page source snippet on failure: {driver.page_source[:2000]}")
-        with open("page_source_on_failure.html", "w", encoding="utf-8") as f:
-            f.write(driver.page_source)
-        logging.info("Full page source saved to 'page_source_on_failure.html'")
         raise
 
 def find_trending_videos(driver):
