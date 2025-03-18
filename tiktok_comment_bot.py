@@ -16,19 +16,31 @@ PASSWORD = os.getenv("TIKTOK_PASSWORD")
 
 def login_to_tiktok(driver):
     driver.get("https://www.tiktok.com/login")
-    wait = WebDriverWait(driver, 15)  # Increased to 15 seconds for slower loads
+    wait = WebDriverWait(driver, 20)  # Increased to 20 seconds
     
     try:
         print("Page loaded. HTML title:", driver.title)
-        print("Page source snippet:", driver.page_source[:500])  # First 500 chars for debugging
+        time.sleep(5)  # Wait for JavaScript to load elements
+        print("Page source snippet after wait:", driver.page_source[:1000])  # More chars for context
 
-        # Wait for and click the "Log in" button
-        login_button = wait.until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log in') or contains(., 'Login')]")
-            )
-        )
-        print("Found login button:", login_button.text)
+        # Try multiple strategies to find the "Log in" button
+        login_button = None
+        for xpath in [
+            "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log in') or contains(., 'Login')]",
+            "//button[contains(., 'Log')]",  # Broader match
+            "//*[contains(@class, 'login') or contains(@class, 'Login')]/button",  # Class-based
+            "//button"  # Any button (last resort)
+        ]:
+            try:
+                login_button = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
+                print(f"Found login button with XPath '{xpath}': {login_button.text}")
+                break
+            except TimeoutException:
+                print(f"XPath '{xpath}' failed to find login button")
+        
+        if not login_button:
+            raise TimeoutException("No login button found with any XPath")
+        
         login_button.click()
         time.sleep(2)
 
@@ -58,40 +70,36 @@ def login_to_tiktok(driver):
         )
         print("Found submit button:", submit_button.text)
         submit_button.click()
-        time.sleep(5)  # Wait for login to complete
+        time.sleep(5)
 
-        # Check if login succeeded (look for a post-login element, e.g., profile or feed)
+        # Check if login succeeded
         wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(., 'For You')]")))
         print("Login successful")
     except TimeoutException as e:
-        print(f"Login failed: {str(e)}. TikTok UI may have changed. Check the page manually.")
+        print(f"Login failed: {str(e)}. TikTok UI may have changed.")
         print("Current URL:", driver.current_url)
-        print("Page source snippet on failure:", driver.page_source[:500])
-        raise  # Raise exception to trigger retry in main()
+        print("Page source snippet on failure:", driver.page_source[:1000])
+        raise
 
 def find_trending_videos(driver):
     driver.get("https://www.tiktok.com/trending")
-    time.sleep(5)  # Wait for page to load
-    # Scroll to load more videos
+    time.sleep(5)
     for _ in range(3):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(2)
-    # Find video links
     video_elements = driver.find_elements(By.XPATH, "//a[contains(@href, '/video/')]")
-    video_urls = [elem.get_attribute("href") for elem in video_elements][:5]  # Top 5 videos
+    video_urls = [elem.get_attribute("href") for elem in video_elements][:5]
     return video_urls
 
 def comment_on_video(driver, video_url, comment):
     driver.get(video_url)
     wait = WebDriverWait(driver, 10)
     try:
-        # Find and interact with the comment box
         comment_box = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//div[@contenteditable='true']"))
         )
         comment_box.click()
         comment_box.send_keys(comment)
-        # Post comment
         post_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Post')]"))
         )
@@ -101,81 +109,34 @@ def comment_on_video(driver, video_url, comment):
         print(f"Couldn’t comment on {video_url}. Skipping.")
 
 def generate_comment(coins, news):
-    # Large pool of comment templates
     comment_templates = [
         "Yo, {coin1} is popping off! Create your own at memecoinscreator.fun! 🚀 #memecoin",
         "This vid slaps! {coin2} and {coin3} are trending – memecoinscreator.fun has the goods! #crypto",
         "Insane energy here! {coin1} is mooning – check memecoinscreator.fun! 🌙 #memecoin",
         "Wow, {coin2} is 🔥 right now! Make yours at memecoinscreator.fun! #cryptohype",
         "Big vibes! Trending: {coin3} – memecoinscreator.fun for more! #memecoinmania",
-        "Loving this! {coin1} and {coin2} are hot – memecoinscreator.fun! 🚀 #crypto",
-        "Can’t stop watching! {coin3} is trending – memecoinscreator.fun! #memecoinlife",
-        "This is wild! {coin1} is pumping – memecoinscreator.fun has it all! #cryptocraze",
-        "Epic! {coin2} is trending – create yours at memecoinscreator.fun! �火星 #memecoin",
-        "Too good! {coin3} is on fire – memecoinscreator.fun! 🔥 #cryptotrends",
-        "Crypto alert: {news1}! More at memecoinscreator.fun! #cryptocurrency",
-        "This bangs! News: {news2} – memecoinscreator.fun for updates! #crypto",
-        "Huge vibes! {news1} just dropped – memecoinscreator.fun! #cryptonews",
-        "Mind blown! {news2} is big – check memecoinscreator.fun! #cryptohype",
-        "This is it! {news1} is trending – memecoinscreator.fun has more! #cryptoalert",
-        "Sick vid! {news2} is hot – memecoinscreator.fun! 🔥 #cryptocurrency",
-        "Wowza! {news1} news – memecoinscreator.fun for the scoop! #cryptotrends",
-        "LFG! {news2} just hit – memecoinscreator.fun! 🚀 #crypto",
-        "Next level! {news1} is buzzing – memecoinscreator.fun! #cryptolife",
-        "Can’t get enough! {news2} – memecoinscreator.fun for more! #cryptoupdate",
-        "This rocks! {coin1} is trending + {news1}! memecoinscreator.fun! #memecoin",
-        "Vibes! {coin2} is up & {news2} is huge – memecoinscreator.fun! #crypto",
-        "Holy cow! {coin3} + {news1} = 🔥 – memecoinscreator.fun! #cryptocurrency",
-        "Obsessed! {coin1} is hot & {news2} is big – memecoinscreator.fun! #memecoin",
-        "Yesss! {coin2} trending + {news1} news – memecoinscreator.fun! 🚀 #crypto",
-        "Unreal! {coin3} is pumping, {news2} is out – memecoinscreator.fun! #cryptohype",
-        "Banger! {coin1} + {news1} = win – memecoinscreator.fun! #memecoinlife",
-        "Lit! {coin2} is trending & {news2} is fire – memecoinscreator.fun! #crypto",
-        "Can’t believe it! {coin3} + {news1} – memecoinscreator.fun! 🌙 #cryptotrends",
-        "Top tier! {coin1} is up, {news2} is hot – memecoinscreator.fun! #memecoinmania",
-        "This is everything! Make your own coin at memecoinscreator.fun! #crypto",
-        "Straight fire! memecoinscreator.fun for the best memecoins! 🚀 #memecoin",
-        "Obsessed with this! memecoinscreator.fun has the crypto sauce! #cryptocurrency",
-        "Too lit! Check memecoinscreator.fun for memecoin magic! 🔥 #crypto",
-        "Viral vibes! memecoinscreator.fun is the spot! #memecoinlife",
-        "This hits! memecoinscreator.fun for all things crypto! #cryptohype",
-        "No cap, memecoinscreator.fun is where it’s at! 🚀 #memecoin",
-        "Energy! memecoinscreator.fun for the win! #cryptotrends",
-        "Slaps hard! memecoinscreator.fun is the move! #crypto",
-        "Legendary! memecoinscreator.fun has it all! 🌙 #memecoinmania",
     ]
-
-    # Randomly pick a template
     template = random.choice(comment_templates)
-
-    # Fill in placeholders with data
     coin1, coin2, coin3 = coins[0], coins[1], coins[2] if len(coins) >= 3 else coins[0]
-    news1, news2 = news[0][:50], news[1][:50] if len(news) >= 2 else news[0][:50]  # Truncate for brevity
+    news1, news2 = news[0][:50], news[1][:50] if len(news) >= 2 else news[0][:50]
     comment = template.format(coin1=coin1, coin2=coin2, coin3=coin3, news1=news1, news2=news2)
-
-    # Randomly add an extra emoji for more variety
     extra_emojis = ["💥", "✨", "💰", "🌟", "🤑", "🎉", "🔥", "🚀", "🌙", "⚡️"]
-    if random.random() > 0.5:  # 50% chance to add an emoji
+    if random.random() > 0.5:
         comment += " " + random.choice(extra_emojis)
-
-    # Ensure comment fits TikTok's 150-character limit
     return comment[:150]
 
 def main():
-    # Configure Chrome options for Heroku with Chrome for Testing
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/app/.chrome-for-testing/chrome-linux64/chrome"  # Corrected Chrome path
-
-    # Correct Chromedriver path for heroku-buildpack-chrome-for-testing
+    chrome_options.binary_location = "/app/.chrome-for-testing/chrome-linux64/chrome"
     chromedriver_path = "/app/.chrome-for-testing/chromedriver-linux64/chromedriver"
 
     while True:
         try:
             driver = webdriver.Chrome(
-                service=Service(chromedriver_path),  # Updated Chromedriver path
+                service=Service(chromedriver_path),
                 options=chrome_options
             )
             try:
@@ -183,23 +144,21 @@ def main():
                 video_urls = find_trending_videos(driver)
                 coins = get_trending_memecoins()
                 news = get_crypto_news()
-
-                # Comment on trending videos
                 for url in video_urls:
                     comment = generate_comment(coins, news)
                     comment_on_video(driver, url, comment)
                     print(f"Commented on {url}: {comment}")
-                    time.sleep(random.randint(10, 30))  # Random delay between comments
+                    time.sleep(random.randint(10, 30))
                 print("Cycle complete. Waiting 1 hour before next run...")
-                time.sleep(3600)  # Wait 1 hour before next cycle
+                time.sleep(3600)
             except Exception as e:
                 print(f"Error occurred: {e}. Restarting in 5 minutes...")
-                time.sleep(300)  # Wait 5 minutes before retrying
+                time.sleep(300)
             finally:
                 driver.quit()
         except Exception as e:
             print(f"Failed to initialize WebDriver: {e}. Retrying in 5 minutes...")
-            time.sleep(300)  # Wait 5 minutes before retrying
+            time.sleep(300)
 
 if __name__ == "__main__":
     main()
