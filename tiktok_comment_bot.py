@@ -37,6 +37,10 @@ def login_to_tiktok(driver):
             time.sleep(3)
         except TimeoutException:
             logging.info("No 'Use phone / email / username' option found, assuming form is directly available")
+            logging.info("Dumping page source after initial load failure:")
+            full_source = driver.page_source
+            for i in range(0, len(full_source), 1000):
+                logging.info(f"Page source chunk: {full_source[i:i+1000]}")
 
         # Step 2: Enter username
         try:
@@ -52,6 +56,10 @@ def login_to_tiktok(driver):
                 time.sleep(0.1)
             time.sleep(2)
         except TimeoutException:
+            logging.error("Username field not found. Dumping full page source:")
+            full_source = driver.page_source
+            for i in range(0, len(full_source), 1000):
+                logging.info(f"Page source chunk: {full_source[i:i+1000]}")
             raise Exception("Username field not found")
 
         # Step 3: Enter password
@@ -69,7 +77,7 @@ def login_to_tiktok(driver):
         except TimeoutException:
             logging.error("Password field not found. Dumping full page source:")
             full_source = driver.page_source
-            for i in range(0, len(full_source), 1000):  # Split into chunks for logs
+            for i in range(0, len(full_source), 1000):
                 logging.info(f"Page source chunk: {full_source[i:i+1000]}")
             raise Exception("Password field not found")
 
