@@ -1,16 +1,22 @@
+# -*- coding: utf-8 -*-
+import os
+import random
+import time
+import logging
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-import time
-import random
-import os
 from crypto_data import get_trending_memecoins, get_crypto_news
 
-# TikTok login credentials from environment variables
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# TikTok credentials from environment variables
 USERNAME = os.getenv("TIKTOK_USERNAME")
 PASSWORD = os.getenv("TIKTOK_PASSWORD")
 
@@ -19,25 +25,24 @@ def login_to_tiktok(driver):
     wait = WebDriverWait(driver, 20)
     
     try:
-        print("Page loaded. HTML title:", driver.title)
-        time.sleep(5)  # Wait for JavaScript
-        print("Page source snippet after wait:", driver.page_source[:2000])  # More context
-
-        # Try multiple strategies to find the "Log in" button
+        logging.info(f"Page loaded. HTML title: {driver.title}")
+        time.sleep(5)  # Wait for JavaScript to load
+        
+        # Try multiple login button selectors
         login_button = None
         for xpath in [
             "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log in') or contains(., 'Login')]",
+            "//button[@data-e2e='login-button']",
             "//button[contains(., 'Log')]",
             "//*[contains(@class, 'login') or contains(@class, 'Login')]/button",
-            "//button[@data-e2e='login-button']",  # TikTok-specific data attribute
-            "//button"  # Last resort
+            "//button"
         ]:
             try:
                 login_button = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-                print(f"Found login button with XPath '{xpath}': {login_button.text}")
+                logging.info(f"Found login button with XPath '{xpath}': {login_button.text}")
                 break
             except TimeoutException:
-                print(f"XPath '{xpath}' failed to find login button")
+                logging.warning(f"XPath '{xpath}' failed to find login button")
         
         if not login_button:
             raise TimeoutException("No login button found with any XPath")
@@ -51,7 +56,7 @@ def login_to_tiktok(driver):
                 (By.XPATH, "//input[@name='username' or @placeholder[contains(., 'Email') or contains(., 'Username') or contains(., 'Phone')]]")
             )
         )
-        print("Found username field")
+        logging.info("Found username field")
         username_field.send_keys(USERNAME)
 
         # Enter password
@@ -60,7 +65,7 @@ def login_to_tiktok(driver):
                 (By.XPATH, "//input[@type='password' or @placeholder[contains(., 'Password')]]")
             )
         )
-        print("Found password field")
+        logging.info("Found password field")
         password_field.send_keys(PASSWORD)
 
         # Submit login form
@@ -69,19 +74,17 @@ def login_to_tiktok(driver):
                 (By.XPATH, "//button[@type='submit' or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log in')]")
             )
         )
-        print("Found submit button:", submit_button.text)
+        logging.info(f"Found submit button: {submit_button.text}")
         submit_button.click()
-        time.sleep(5)
+        time.sleep(10)  # Wait for login to complete
 
         # Check if login succeeded
         wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(., 'For You')]")))
-        print("Login successful")
-    except TimeoutException as e:
-        print(f"Login failed: {str(e)}. TikTok UI may have changed.")
-        print("Current URL:", driver.current_url)
-        with open("page_source_on_failure.html", "w", encoding="utf-8") as f:
-            f.write(driver.page_source)  # Save full source locally
-        print("Full page source saved to 'page_source_on_failure.html' (check Heroku filesystem)")
+        logging.info("Login successful")
+    except Exception as e:
+        logging.error(f"Login failed: {str(e)}. TikTok UI may have changed.")
+        logging.info(f"Current URL: {driver.current_url}")
+        logging.info(f"Page source snippet on failure: {driver.page_source[:1000]}")
         raise
 
 def find_trending_videos(driver):
@@ -92,6 +95,7 @@ def find_trending_videos(driver):
         time.sleep(2)
     video_elements = driver.find_elements(By.XPATH, "//a[contains(@href, '/video/')]")
     video_urls = [elem.get_attribute("href") for elem in video_elements][:5]
+    logging.info(f"Found {len(video_urls)} trending video URLs")
     return video_urls
 
 def comment_on_video(driver, video_url, comment):
@@ -108,8 +112,9 @@ def comment_on_video(driver, video_url, comment):
         )
         post_button.click()
         time.sleep(2)
+        logging.info(f"Commented on {video_url}: {comment}")
     except TimeoutException:
-        print(f"Couldn’t comment on {video_url}. Skipping.")
+        logging.warning(f"Couldn’t comment on {video_url}. Skipping.")
 
 def generate_comment(coins, news):
     comment_templates = [
@@ -121,25 +126,25 @@ def generate_comment(coins, news):
     ]
     template = random.choice(comment_templates)
     coin1, coin2, coin3 = coins[0], coins[1], coins[2] if len(coins) >= 3 else coins[0]
-    news1, news2 = news[0][:50], news[1][:50] if len(news) >= 2 else news[0][:50]
-    comment = template.format(coin1=coin1, coin2=coin2, coin3=coin3, news1=news1, news2=news2)
+    news1 = news[0][:50]  # News not used in templates, but kept for future expansion
+    comment = template.format(coin1=coin1, coin2=coin2, coin3=coin3)
     extra_emojis = ["💥", "✨", "💰", "🌟", "🤑", "🎉", "🔥", "🚀", "🌙", "⚡️"]
     if random.random() > 0.5:
         comment += " " + random.choice(extra_emojis)
-    return comment[:150]
+    return comment[:150]  # TikTok comment limit is ~150 characters
 
 def main():
-    chrome_options = webdriver.ChromeOptions()
+    chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/app/.chrome-for-testing/chrome-linux64/chrome"
-    chromedriver_path = "/app/.chrome-for-testing/chromedriver-linux64/chromedriver"
+    chrome_options.binary_location = os.getenv("GOOGLE_CHROME_BIN", "/app/.chrome-for-testing/chrome-linux64/chrome")
+    chromedriver_path = os.getenv("CHROMEDRIVER_PATH", "/app/.chrome-for-testing/chromedriver-linux64/chromedriver")
 
     while True:
         try:
             driver = webdriver.Chrome(
-                service=Service(chromedriver_path),
+                service=Service(executable_path=chromedriver_path),
                 options=chrome_options
             )
             try:
@@ -150,17 +155,16 @@ def main():
                 for url in video_urls:
                     comment = generate_comment(coins, news)
                     comment_on_video(driver, url, comment)
-                    print(f"Commented on {url}: {comment}")
-                    time.sleep(random.randint(10, 30))
-                print("Cycle complete. Waiting 1 hour before next run...")
-                time.sleep(3600)
+                    time.sleep(random.randint(10, 30))  # Random delay between comments
+                logging.info("Cycle complete. Waiting 1 hour before next run...")
+                time.sleep(3600)  # 1-hour delay between cycles
             except Exception as e:
-                print(f"Error occurred: {e}. Restarting in 5 minutes...")
+                logging.error(f"Error occurred: {e}. Restarting in 5 minutes...")
                 time.sleep(300)
             finally:
                 driver.quit()
         except Exception as e:
-            print(f"Failed to initialize WebDriver: {e}. Retrying in 5 minutes...")
+            logging.error(f"Failed to initialize WebDriver: {e}. Retrying in 5 minutes...")
             time.sleep(300)
 
 if __name__ == "__main__":
