@@ -1,6 +1,5 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -142,14 +141,19 @@ def generate_comment(coins, news):
     return comment[:150]
 
 def main():
-    # Configure Chrome options for Heroku (headless mode)
+    # Configure Chrome options for Heroku with Chrome for Testing
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.binary_location = "/app/.chrome-for-testing/chrome"  # Heroku Chrome path
 
     while True:
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        # Use ChromeDriver from the buildpack path
+        driver = webdriver.Chrome(
+            service=Service("/app/.chrome-for-testing/chromedriver"),  # Heroku Chromedriver path
+            options=chrome_options
+        )
         try:
             login_to_tiktok(driver)
             video_urls = find_trending_videos(driver)
