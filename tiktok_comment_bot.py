@@ -21,7 +21,7 @@ PASSWORD = os.getenv("TIKTOK_PASSWORD")
 
 def login_to_tiktok(driver):
     driver.get("https://www.tiktok.com/login")
-    wait = WebDriverWait(driver, 30)
+    wait = WebDriverWait(driver, 40)  # Increased timeout
     
     try:
         logging.info(f"Page loaded. HTML title: {driver.title}")
@@ -34,7 +34,7 @@ def login_to_tiktok(driver):
             )
             email_login_option.click()
             logging.info("Clicked 'Use phone / email / username' option")
-            time.sleep(3)  # Increased delay
+            time.sleep(3)
         except TimeoutException:
             logging.info("No 'Use phone / email / username' option found, assuming form is directly available")
 
@@ -47,17 +47,18 @@ def login_to_tiktok(driver):
             )
             logging.info("Found username field")
             username_field.clear()
-            for char in USERNAME:  # Type slowly to avoid detection
+            for char in USERNAME:
                 username_field.send_keys(char)
                 time.sleep(0.1)
+            time.sleep(2)  # Extra delay after username
         except TimeoutException:
             raise Exception("Username field not found")
 
-        # Step 3: Enter password
+        # Step 3: Enter password (broader selector)
         try:
             password_field = wait.until(
                 EC.presence_of_element_located(
-                    (By.XPATH, "//input[@type='password' or @placeholder[contains(., 'Password')]]")
+                    (By.XPATH, "//input[@type='password' or @placeholder[contains(., 'Password')] or @name='password' or contains(@class, 'pass')]")
                 )
             )
             logging.info("Found password field")
@@ -88,7 +89,7 @@ def login_to_tiktok(driver):
             raise TimeoutException("No login button found with any XPath")
         
         login_button.click()
-        time.sleep(10)  # Wait for login
+        time.sleep(10)
 
         # Step 5: Check login success
         wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(., 'For You')]")))
@@ -152,8 +153,8 @@ def main():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")  # Extra stability
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")  # Mimic real browser
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
     chrome_options.binary_location = os.getenv("GOOGLE_CHROME_BIN", "/app/.chrome-for-testing/chrome-linux64/chrome")
     chromedriver_path = os.getenv("CHROMEDRIVER_PATH", "/app/.chrome-for-testing/chromedriver-linux64/chromedriver")
 
