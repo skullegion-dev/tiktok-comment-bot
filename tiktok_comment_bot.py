@@ -83,9 +83,9 @@ def login_to_tiktok(driver):
         wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(., 'For You')]")))
         logging.info("Login successful")
     except Exception as e:
-        logging.error(f"Login failed: {str(e)}. TikTok UI may have changed.")
+        logging.error(f"Login failed: {str(e)}. TikTok UI may have changed or CAPTCHA detected.")
         logging.info(f"Current URL: {driver.current_url}")
-        logging.info(f"Page source snippet on failure: {driver.page_source[:2000]}")  # More context
+        logging.info(f"Page source snippet on failure: {driver.page_source[:2000]}")
         with open("page_source_on_failure.html", "w", encoding="utf-8") as f:
             f.write(driver.page_source)
         logging.info("Full page source saved to 'page_source_on_failure.html'")
@@ -163,4 +163,12 @@ def main():
                 time.sleep(3600)
             except Exception as e:
                 logging.error(f"Error occurred: {e}. Restarting in 5 minutes...")
-                time.sleep(300
+                time.sleep(300)  # Fixed syntax here
+            finally:
+                driver.quit()
+        except Exception as e:
+            logging.error(f"Failed to initialize WebDriver: {e}. Retrying in 5 minutes...")
+            time.sleep(300)  # Fixed syntax here
+
+if __name__ == "__main__":
+    main()
