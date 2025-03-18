@@ -148,31 +148,37 @@ def main():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.binary_location = "/app/.chrome-for-testing/chrome"  # Heroku Chrome path
 
-    while True:
-        # Use ChromeDriver from the buildpack path
-        driver = webdriver.Chrome(
-            service=Service("/app/.chrome-for-testing/chromedriver"),  # Heroku Chromedriver path
-            options=chrome_options
-        )
-        try:
-            login_to_tiktok(driver)
-            video_urls = find_trending_videos(driver)
-            coins = get_trending_memecoins()
-            news = get_crypto_news()
+    # Correct Chromedriver path for heroku-buildpack-chrome-for-testing
+    chromedriver_path = "/app/.chrome-for-testing/chromedriver-linux64/chromedriver"
 
-            # Comment on trending videos
-            for url in video_urls:
-                comment = generate_comment(coins, news)
-                comment_on_video(driver, url, comment)
-                print(f"Commented on {url}: {comment}")
-                time.sleep(random.randint(10, 30))  # Random delay between comments
-            print("Cycle complete. Waiting 1 hour before next run...")
-            time.sleep(3600)  # Wait 1 hour before next cycle
+    while True:
+        try:
+            driver = webdriver.Chrome(
+                service=Service(chromedriver_path),  # Updated Chromedriver path
+                options=chrome_options
+            )
+            try:
+                login_to_tiktok(driver)
+                video_urls = find_trending_videos(driver)
+                coins = get_trending_memecoins()
+                news = get_crypto_news()
+
+                # Comment on trending videos
+                for url in video_urls:
+                    comment = generate_comment(coins, news)
+                    comment_on_video(driver, url, comment)
+                    print(f"Commented on {url}: {comment}")
+                    time.sleep(random.randint(10, 30))  # Random delay between comments
+                print("Cycle complete. Waiting 1 hour before next run...")
+                time.sleep(3600)  # Wait 1 hour before next cycle
+            except Exception as e:
+                print(f"Error occurred: {e}. Restarting in 5 minutes...")
+                time.sleep(300)  # Wait 5 minutes before retrying
+            finally:
+                driver.quit()
         except Exception as e:
-            print(f"Error occurred: {e}. Restarting in 5 minutes...")
+            print(f"Failed to initialize WebDriver: {e}. Retrying in 5 minutes...")
             time.sleep(300)  # Wait 5 minutes before retrying
-        finally:
-            driver.quit()
 
 if __name__ == "__main__":
     main()
