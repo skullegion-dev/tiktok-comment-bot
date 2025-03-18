@@ -16,36 +16,57 @@ PASSWORD = os.getenv("TIKTOK_PASSWORD")
 
 def login_to_tiktok(driver):
     driver.get("https://www.tiktok.com/login")
-    wait = WebDriverWait(driver, 10)  # Wait up to 10 seconds for elements
+    wait = WebDriverWait(driver, 15)  # Increased to 15 seconds for slower loads
     
     try:
+        print("Page loaded. HTML title:", driver.title)
+        print("Page source snippet:", driver.page_source[:500])  # First 500 chars for debugging
+
         # Wait for and click the "Log in" button
         login_button = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Log in') or contains(., 'Login')]"))
+            EC.element_to_be_clickable(
+                (By.XPATH, "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log in') or contains(., 'Login')]")
+            )
         )
+        print("Found login button:", login_button.text)
         login_button.click()
         time.sleep(2)
 
         # Enter username
         username_field = wait.until(
-            EC.presence_of_element_located((By.XPATH, "//input[@name='username' or @placeholder='Email or Username']"))
+            EC.presence_of_element_located(
+                (By.XPATH, "//input[@name='username' or @placeholder[contains(., 'Email') or contains(., 'Username') or contains(., 'Phone')]]")
+            )
         )
+        print("Found username field")
         username_field.send_keys(USERNAME)
 
         # Enter password
         password_field = wait.until(
-            EC.presence_of_element_located((By.XPATH, "//input[@type='password']"))
+            EC.presence_of_element_located(
+                (By.XPATH, "//input[@type='password' or @placeholder[contains(., 'Password')]]")
+            )
         )
+        print("Found password field")
         password_field.send_keys(PASSWORD)
 
         # Submit login form
         submit_button = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//button[@type='submit' or contains(., 'Log in')]"))
+            EC.element_to_be_clickable(
+                (By.XPATH, "//button[@type='submit' or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log in')]")
+            )
         )
+        print("Found submit button:", submit_button.text)
         submit_button.click()
         time.sleep(5)  # Wait for login to complete
-    except TimeoutException:
-        print("Login elements not found. TikTok UI may have changed. Check the page manually.")
+
+        # Check if login succeeded (look for a post-login element, e.g., profile or feed)
+        wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(., 'For You')]")))
+        print("Login successful")
+    except TimeoutException as e:
+        print(f"Login failed: {str(e)}. TikTok UI may have changed. Check the page manually.")
+        print("Current URL:", driver.current_url)
+        print("Page source snippet on failure:", driver.page_source[:500])
         raise  # Raise exception to trigger retry in main()
 
 def find_trending_videos(driver):
