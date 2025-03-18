@@ -10,8 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from crypto_data import get_trending_memecoins, get_crypto_news
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,45 +21,57 @@ PASSWORD = os.getenv("TIKTOK_PASSWORD")
 
 def login_to_tiktok(driver):
     driver.get("https://www.tiktok.com/login")
-    wait = WebDriverWait(driver, 30)  # Increased timeout
+    wait = WebDriverWait(driver, 30)
     
     try:
         logging.info(f"Page loaded. HTML title: {driver.title}")
-        time.sleep(5)  # Wait for initial JS load
+        time.sleep(5)  # Wait for JS load
         
-        # Step 1: Click "Use phone / email / username" if present
+        # Step 1: Click "Use phone / email / username"
         try:
             email_login_option = wait.until(
                 EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Use phone / email / username')]"))
             )
             email_login_option.click()
             logging.info("Clicked 'Use phone / email / username' option")
-            time.sleep(2)
+            time.sleep(3)  # Increased delay
         except TimeoutException:
             logging.info("No 'Use phone / email / username' option found, assuming form is directly available")
 
         # Step 2: Enter username
-        username_field = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//input[@name='username' or @placeholder[contains(., 'Email') or contains(., 'Username') or contains(., 'Phone')]]")
+        try:
+            username_field = wait.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//input[@name='username' or @placeholder[contains(., 'Email') or contains(., 'Username') or contains(., 'Phone')]]")
+                )
             )
-        )
-        logging.info("Found username field")
-        username_field.send_keys(USERNAME)
+            logging.info("Found username field")
+            username_field.clear()
+            for char in USERNAME:  # Type slowly to avoid detection
+                username_field.send_keys(char)
+                time.sleep(0.1)
+        except TimeoutException:
+            raise Exception("Username field not found")
 
         # Step 3: Enter password
-        password_field = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//input[@type='password' or @placeholder[contains(., 'Password')]]")
+        try:
+            password_field = wait.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//input[@type='password' or @placeholder[contains(., 'Password')]]")
+                )
             )
-        )
-        logging.info("Found password field")
-        password_field.send_keys(PASSWORD)
+            logging.info("Found password field")
+            password_field.clear()
+            for char in PASSWORD:
+                password_field.send_keys(char)
+                time.sleep(0.1)
+        except TimeoutException:
+            raise Exception("Password field not found")
 
         # Step 4: Click "Log in" button
         login_button = None
         for xpath in [
-            "//button[@data-e2e='login-button']",  # Current TikTok-specific attribute
+            "//button[@data-e2e='login-button']",
             "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log in')]",
             "//button[@type='submit']",
             "//button[contains(., 'Log')]",
@@ -77,9 +88,9 @@ def login_to_tiktok(driver):
             raise TimeoutException("No login button found with any XPath")
         
         login_button.click()
-        time.sleep(10)  # Wait for login to complete
+        time.sleep(10)  # Wait for login
 
-        # Step 5: Check if login succeeded
+        # Step 5: Check login success
         wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(., 'For You')]")))
         logging.info("Login successful")
     except Exception as e:
@@ -141,6 +152,8 @@ def main():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")  # Extra stability
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")  # Mimic real browser
     chrome_options.binary_location = os.getenv("GOOGLE_CHROME_BIN", "/app/.chrome-for-testing/chrome-linux64/chrome")
     chromedriver_path = os.getenv("CHROMEDRIVER_PATH", "/app/.chrome-for-testing/chromedriver-linux64/chromedriver")
 
@@ -163,12 +176,12 @@ def main():
                 time.sleep(3600)
             except Exception as e:
                 logging.error(f"Error occurred: {e}. Restarting in 5 minutes...")
-                time.sleep(300)  # Fixed syntax here
+                time.sleep(300)
             finally:
                 driver.quit()
-        except Exception as e:
-            logging.error(f"Failed to initialize WebDriver: {e}. Retrying in 5 minutes...")
-            time.sleep(300)  # Fixed syntax here
+        except WebDriverException as e:
+            logging.error(f"WebDriver failed to initialize: {e}. Retrying in 5 minutes...")
+            time.sleep(300)
 
 if __name__ == "__main__":
     main()
